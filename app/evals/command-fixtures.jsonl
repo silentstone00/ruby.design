@@ -1,0 +1,4 @@
+{"command":"add a blue button","context":{"selectedIds":[],"hoverId":null},"expected":[{"type":"create_shape","shape":"rect","props":{"color":"blue"}}]}
+{"command":"make it bigger","context":{"selectedIds":["shape:box"],"hoverId":null},"expected":[{"type":"resize","targetId":"shape:box"}]}
+{"command":"move this left a bit","context":{"selectedIds":["shape:box"],"hoverId":null},"expected":[{"type":"move","targetId":"shape:box","dx":-24,"dy":0}]}
+{"command":"make this red","context":{"selectedIds":["shape:box"],"hoverId":null},"expected":[{"type":"set_prop","targetId":"shape:box","path":"props.color","value":"red"}]}
