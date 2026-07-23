@@ -1,7 +1,8 @@
-import { FormEvent, useState } from 'react'
+import { FormEvent, useRef, useState } from 'react'
 import { Mic, SendHorizonal } from 'lucide-react'
 import type { CanvasContext } from '../canvas/canvasContext'
 import type { OperationResult } from '../operations/types'
+import { BrowserSpeechAdapter, type SttAdapter } from '../voice/sttAdapter'
 import { useTranscriptState } from '../voice/transcriptStore'
 
 type TranscriptPanelProps = {
@@ -12,6 +13,9 @@ type TranscriptPanelProps = {
 
 export function TranscriptPanel({ onSubmit, history, context }: TranscriptPanelProps) {
   const [command, setCommand] = useState('')
+  const [isListening, setIsListening] = useState(false)
+  const [speechError, setSpeechError] = useState<string | null>(null)
+  const sttAdapter = useRef<SttAdapter | null>(null)
   const transcript = useTranscriptState()
 
   function submit(event: FormEvent) {
@@ -23,6 +27,45 @@ export function TranscriptPanel({ onSubmit, history, context }: TranscriptPanelP
     setCommand('')
   }
 
+  async function toggleMic() {
+    setSpeechError(null)
+
+    if (isListening) {
+      await sttAdapter.current?.stop()
+      setIsListening(false)
+      transcript.setInterim('')
+      return
+    }
+
+    const adapter = new BrowserSpeechAdapter()
+    sttAdapter.current = adapter
+    setIsListening(true)
+
+    await adapter.start((event) => {
+      if (event.type === 'interim') {
+        transcript.setInterim(event.text)
+        setCommand(event.text)
+        return
+      }
+
+      if (event.type === 'final') {
+        transcript.addFinal(event.text)
+        setCommand('')
+        setIsListening(false)
+        onSubmit(event.text)
+        return
+      }
+
+      if (event.type === 'end') {
+        setIsListening(false)
+        return
+      }
+
+      setSpeechError(event.message)
+      setIsListening(false)
+    })
+  }
+
   return (
     <div className="transcript-panel">
       <div className="panel-heading">
@@ -30,10 +73,21 @@ export function TranscriptPanel({ onSubmit, history, context }: TranscriptPanelP
           <h1>Ruby Design</h1>
           <p>{context ? `${context.visibleShapes.length} shapes in view` : 'Canvas starting'}</p>
         </div>
-        <button className="mic-button" title="Push to talk" aria-label="Push to talk">
+        <button
+          className={isListening ? 'mic-button is-listening' : 'mic-button'}
+          title={isListening ? 'Stop listening' : 'Push to talk'}
+          aria-label={isListening ? 'Stop listening' : 'Push to talk'}
+          onClick={toggleMic}
+        >
           <Mic size={18} />
         </button>
       </div>
+
+      {(transcript.interim || speechError) && (
+        <div className={speechError ? 'speech-status speech-error' : 'speech-status'}>
+          {speechError ?? transcript.interim}
+        </div>
+      )}
 
       <form className="command-form" onSubmit={submit}>
         <input

@@ -8,6 +8,8 @@ type SpeechRecognitionConstructor = new () => SpeechRecognition
 interface SpeechRecognition extends EventTarget {
   continuous: boolean
   interimResults: boolean
+  lang: string
+  onend: (() => void) | null
   onresult: ((event: SpeechRecognitionEvent) => void) | null
   onerror: ((event: SpeechRecognitionErrorEvent) => void) | null
   start(): void

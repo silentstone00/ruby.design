@@ -72,6 +72,12 @@ input {
   opacity: 0.45;
 }
 
+.mic-button.is-listening {
+  border-color: #b0302a;
+  background: #b0302a;
+  color: #ffffff;
+}
+
 .toolbar-spacer {
   flex: 1;
 }
@@ -109,6 +115,23 @@ input {
   grid-template-columns: minmax(0, 1fr) 38px;
   gap: 8px;
   margin-bottom: 16px;
+}
+
+.speech-status {
+  margin: -6px 0 12px;
+  border: 1px solid #d7e2cc;
+  border-radius: 6px;
+  padding: 9px 10px;
+  background: #f5faef;
+  color: #3f5d2a;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.speech-error {
+  border-color: #efc7c3;
+  background: #fff6f5;
+  color: #9c332d;
 }
 
 .command-form input {
