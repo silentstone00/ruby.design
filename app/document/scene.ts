@@ -5,9 +5,16 @@ export type CornerRadii = {
   bottomLeft: number
 }
 
+export type ImageCrop = {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
 export type DesignNode = {
   id: string
-  type: 'frame' | 'rect' | 'ellipse' | 'line' | 'arrow' | 'text'
+  type: 'frame' | 'rect' | 'ellipse' | 'line' | 'arrow' | 'text' | 'image'
   name: string
   x: number
   y: number
@@ -25,6 +32,13 @@ export type DesignNode = {
   textAlign?: 'left' | 'center' | 'right'
   radius?: CornerRadii
   preset?: 'iphone-16-pro' | 'iphone-16'
+  /** Coordinates are relative to this parent frame when present. */
+  parentId?: string
+  /** Frames clip their child content to the screen bounds by default. */
+  clipContent?: boolean
+  imageSrc?: string
+  imageSize?: { width: number; height: number }
+  imageCrop?: ImageCrop
   groupId?: string
 }
 
@@ -33,6 +47,7 @@ export type DesignScene = {
 }
 
 export const IPHONE_16_PRO = { width: 402, height: 874 } as const
+export const IPHONE_16 = { width: 393, height: 852 } as const
 
 export function uniformRadius(value = 0): CornerRadii {
   return { topLeft: value, topRight: value, bottomRight: value, bottomLeft: value }
@@ -55,13 +70,14 @@ export function createStarterScene(): DesignScene {
         strokeWidth: 1,
         preset: 'iphone-16-pro',
         radius: uniformRadius(54),
+        clipContent: true,
       },
       {
         id: 'welcome-title',
         type: 'text',
         name: 'Welcome title',
-        x: 222,
-        y: 176,
+        x: 32,
+        y: 86,
         width: 330,
         height: 52,
         fill: 'transparent',
@@ -70,13 +86,14 @@ export function createStarterScene(): DesignScene {
         fontSize: 28,
         fontWeight: 700,
         textAlign: 'left',
+        parentId: 'frame-iphone-16-pro',
       },
       {
         id: 'primary-button',
         type: 'rect',
         name: 'Primary button',
-        x: 222,
-        y: 742,
+        x: 32,
+        y: 652,
         width: 338,
         height: 54,
         fill: '#2563eb',
@@ -85,6 +102,7 @@ export function createStarterScene(): DesignScene {
         fontWeight: 650,
         textAlign: 'center',
         radius: uniformRadius(14),
+        parentId: 'frame-iphone-16-pro',
       },
     ],
   }

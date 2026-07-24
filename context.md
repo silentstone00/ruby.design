@@ -1,210 +1,137 @@
-# Ruby Design Project Context
+# Ruby Design Context
 
-Ruby Design is intended to become a voice-first design tool, closer to a Figma competitor than a whiteboard app.
+## Product
 
-## Current Repo
+Ruby Design is a voice-first UI design tool. The first product wedge is mobile/iOS screen design, but the long-term intent is a Figma-like editor with a custom document model, reusable components, and AI/voice operations.
 
-Repo: `git@github.com:silentstone00/ruby.design.git`
+Repository: `git@github.com:silentstone00/ruby.design.git`
+
 Branch: `main`
+Latest custom-editor milestone: `8282cf7` (`Build custom design canvas interactions`)
 
-The current implementation is a React + Vite + TypeScript prototype using tldraw. It was built as an early spike for typed and voice command flow, not as the final editor foundation.
+## Current Architecture
 
-Important folders:
+The active editor no longer uses tldraw. It is a React + Vite + TypeScript application with:
 
-- `app/canvas/` - current tldraw integration.
-- `app/document/` - document schema, serialization, migrations.
-- `app/operations/` - typed design operation schema and operation applier.
-- `app/voice/` - browser speech adapter and transcript state.
-- `app/intelligence/` - local command parser and future LLM tool schema.
-- `app/referenceResolver/` - resolves references such as "this", "that", and "it".
-- `app/ui/` - side panel, toolbar, transcript/history.
-- `app/persistence/` - localStorage save/load.
-- `app/evals/` - command fixture examples.
+- A custom typed scene graph.
+- SVG rendering with in-place `contentEditable` text inside SVG `foreignObject` nodes for direct editing.
+- A world-space SVG viewport (`x`, `y`, `zoom`) shared by input, selection, marquee, resizing, rotation, and text editing.
+- Frames, rectangles, ellipses, text, lines, and arrows.
+- Nested frame children stored as local coordinates through `parentId`, with clipping performed in each parent frame's local nested SVG viewport.
+- Selection, multi-selection, marquee selection, drag, resize, aspect-ratio lock, rotation, grouping, layer ordering, duplicate, delete, and rename.
+- Browser speech recognition only as a prototype; typed commands remain the reliable input path.
 
-## Current Problems
+The `tldraw` dependency and spike files are still in the repo for reference, but they are not imported by the active application path.
 
-tldraw is likely the wrong long-term foundation.
+## What Works Now
 
-Reasons:
+- iPhone 16 Pro starter frame, heading, and button. The heading and button are real children of the frame, not independent canvas objects.
+- Dragging a node onto a frame reparents it to that frame using local coordinates; dragging it outside all frames detaches it to the canvas without a visual jump.
+- Frame insertion has two modes: Custom Frame creates a plain clipped artboard without device chrome; iPhone Frame offers iPhone 16 and iPhone 16 Pro presets, which render device chrome including the Dynamic Island. New frames are top-level screens, not children of the selected screen.
+- Frame names render above their frame boundary as editor labels; they are not part of the screen content.
+- Insert menu: Frame, Text, Rectangle, and Image create nodes. A selected frame, or a selected child inside a frame, becomes the insertion parent. Component remains disabled until its underlying system exists.
+- Image insertion: the Insert menu can import a local image as a native image node. Images retain source dimensions, are clipped by parent frames, support rounded corners, and have normalized crop controls in the inspector. Imported image data is currently stored in the local document as a data URL.
+- SVG canvas with zoom, fit-to-selection, wheel zoom, space/middle-mouse pan, plus keyboard viewport controls.
+- The SVG viewport tracks the rendered canvas aspect ratio, keeping pointer math and in-place text editing aligned at different zoom levels and panel widths.
+- All gesture coordinates resolve through the root canvas SVG, preventing nested text, shapes, images, and frames from jumping when dragged.
+- The canvas is contained by the editor grid; the side panel scrolls independently instead of allowing canvas paint to extend underneath it.
+- Rectangles with individual corner radii.
+- Direct in-place text editing: double-click text or button labels, type directly in the component, `Enter` saves, and `Escape` cancels. The editor has no blank textarea overlay.
+- The sidebar toolbar wraps actions into rows and blocks horizontal overflow, keeping its controls reachable at narrow desktop widths.
+- A contextual Layers panel appears at the left of the canvas only when a frame or one of its descendants is selected. It lists that frame's nested hierarchy, keeps a dynamic height with a capped scroll area, and stays synchronized with canvas selection.
+- Inspector: name, x/y/w/h display, fill, stroke, opacity, corner radius, text color, font size, and text alignment.
+- Typed commands: create shapes, move, resize, change color, set text, and set corner radius.
+- Save/load to browser localStorage.
+- Basic undo/redo via scene snapshots.
+- Keyboard shortcuts outside form inputs:
+  - `Cmd/Ctrl+A`: select all
+  - `Cmd/Ctrl+D`: duplicate
+  - `Delete`/`Backspace`: delete
+  - `Cmd/Ctrl+Z`: undo
+  - `Cmd/Ctrl+Shift+Z`: redo
+  - `+`/`-`: zoom
+  - Arrow keys: pan; `Shift` makes larger pan steps
+  - `0`: fit selection
+  - `Escape`: clear selection
 
-- Figma-like flexibility is required.
-- Need first-class corner radius and per-corner radius.
-- Need frames/artboards such as iPhone, desktop, and tablet.
-- Need native component libraries like iOS components.
-- Need a design-specific schema for constraints, auto-layout, fills, strokes, shadows, effects, components, and variants.
-- tldraw's default shape schema does not expose core design-tool concepts cleanly enough.
+## Important Limitations
 
-The mic currently uses the browser Web Speech API. This is not production-ready. It often returns `network` errors because browser speech recognition depends on a remote browser speech service.
+- Groups are currently flat `groupId` membership; frame nesting is supported, but nested group nodes are not.
+- Frame clipping is implemented for SVG-rendered content. The full component model, constraints, scrolling behavior, and Auto Layout semantics are still absent.
+- Undo/redo currently stores scene snapshots. Replace it with typed operation transactions and inverse operations before large documents or collaboration.
+- The browser Web Speech API often emits `network` errors. Do not treat it as production STT.
+- tldraw is legacy spike code, not the editor foundation.
+- No backend, auth, collaborative editing, exported files, component library, Auto Layout, or constraints yet. Image assets currently use local data URLs rather than a durable asset store.
 
-## Product Direction
+## File Map
 
-Pivot away from tldraw toward a custom Figma-like editor architecture.
+### Root files
 
-Recommended architecture:
+- `package.json`: dependencies and Vite commands (`dev`, `build`, `typecheck`, `preview`).
+- `index.html`: Vite HTML entry document.
+- `vite.config.ts`: Vite configuration.
+- `tsconfig.json`: TypeScript compiler configuration.
+- `TASKS.md`: living implementation checklist; use this to choose the next scoped build task.
+- `direction.md`: product and technical direction based on the research review.
+- `context.md`: this handoff file.
 
-- Custom scene graph.
-- Custom renderer, probably SVG/HTML first for MVP.
-- Later Canvas/WebGL/WebGPU if performance requires it.
-- First-class design node schema.
-- Voice operations targeting our own schema.
-- iOS/mobile frame and component library.
-- Layers panel.
-- Property inspector.
-- Persistence.
-- Later multiplayer.
+### Application entry and styling
 
-## Recommended MVP Reset
+- `app/main.tsx`: React entry point; imports global styling and mounts `App`.
+- `app/styles.css`: all application, inspector, SVG selection, resize, rotation, in-place editor, viewport chrome, and responsive toolbar styling.
 
-Build a custom editor with these core nodes:
+### Active canvas and editor UI
 
-```ts
-type DesignNode =
-  | FrameNode
-  | RectNode
-  | TextNode
-  | ImageNode
-  | GroupNode
-  | ComponentInstanceNode
+- `app/canvas/DesignCanvas.tsx`: active SVG editor. Owns viewport state, wheel/keyboard zoom, pan, selection/marquee pointer handling, drag, resize handles, rotation handle, recursive frame-child rendering through local nested SVG clip viewports, and in-place text editing through SVG `foreignObject`.
+- `app/canvas/canvasContext.ts`: converts the current scene and selection into a compact context consumed by command parsing and reference resolution.
+- `app/ui/App.tsx`: root editor state coordinator. Owns scene state, selection, scene-snapshot undo/redo, persistence actions, frame-aware insertion, duplicate/delete/move actions, drag-drop reparenting, grouping/order actions, and global editing shortcuts.
+- `app/ui/Inspector.tsx`: selected-node property inspector; updates scene node properties such as name, paint, opacity, radius, typography, and normalized image crop values.
+- `app/ui/LayersPanel.tsx`: contextual canvas overlay that derives and displays the selected frame's descendant tree; selecting a layer selects its canvas node.
+- `app/ui/Toolbar.tsx`: top command toolbar. Includes the Insert menu (Frame, Text, Rectangle, Image), wrapping action rows, undo/redo, object actions, layer ordering, save/load, and a print-export placeholder. Component remains disabled until its backend model is implemented.
+- `app/ui/TranscriptPanel.tsx`: voice/typed command panel, microphone state, interim transcript, and operation history.
 
-type FrameNode = {
-  id: string
-  type: 'frame'
-  name: string
-  x: number
-  y: number
-  width: number
-  height: number
-  preset?: 'iphone-15' | 'iphone-15-pro' | 'ipad' | 'desktop'
-  children: string[]
-}
+### Document model and persistence
 
-type RectNode = {
-  id: string
-  type: 'rect'
-  name: string
-  x: number
-  y: number
-  width: number
-  height: number
-  radius:
-    | number
-    | {
-        topLeft: number
-        topRight: number
-        bottomRight: number
-        bottomLeft: number
-      }
-  fills: Paint[]
-  strokes: Stroke[]
-  shadows: Shadow[]
-}
+- `app/document/scene.ts`: active scene graph types (`DesignScene`, `DesignNode`, corner radii, image crop state), including `parentId` for local child coordinates and `clipContent` for frames; also holds iPhone preset dimensions and the starter document scene.
+- `app/document/schema.ts`: persisted Ruby Design document envelope and schema version.
+- `app/document/serialization.ts`: serializes/parses the current custom scene document.
+- `app/document/migrations.ts`: validates/migrates persisted document data; legacy tldraw data falls back to a starter custom scene.
+- `app/persistence/localStorage.ts`: save/load current custom scene to browser localStorage.
 
-type TextNode = {
-  id: string
-  type: 'text'
-  name: string
-  x: number
-  y: number
-  width: number
-  height: number
-  text: string
-  fontSize: number
-  fontWeight: number
-  color: string
-}
-```
+### Operations and command interpretation
 
-## Voice Commands
+- `app/operations/types.ts`: shared command operation types and operation result format.
+- `app/operations/applySceneOperations.ts`: active pure operation applier for the custom scene graph. Used for typed/voice commands.
+- `app/intelligence/commandParser.ts`: deterministic local parser for simple natural-language commands such as create, move, resize, color, text, and radius.
+- `app/referenceResolver/referenceResolver.ts`: resolves deictic targets including `this`, `that`, `it`, `selected`, and `hovered` against canvas context.
+- `app/intelligence/toolSchema.ts`: draft LLM tool schema for a future model-backed command parser.
+- `app/intelligence/llmClient.ts`: placeholder boundary for a future secure LLM integration; do not put API keys in the browser.
+- `app/evals/command-fixtures.jsonl`: command examples and expected operation fixtures; expand this as the parser grows.
 
-Keep the typed operation idea, but apply it to the custom schema:
+### Voice prototype
 
-```ts
-type DesignOperation =
-  | { type: 'create_node'; node: DesignNode }
-  | { type: 'set_prop'; targetId: string; path: string; value: unknown }
-  | { type: 'move'; targetId: string; dx: number; dy: number }
-  | { type: 'resize'; targetId: string; width?: number; height?: number }
-  | { type: 'create_frame'; preset: 'iphone-15' | 'iphone-15-pro' | 'desktop' }
-  | { type: 'insert_component'; componentId: string; frameId?: string }
-  | { type: 'undo' }
-  | { type: 'redo' }
-```
+- `app/voice/sttAdapter.ts`: speech-to-text abstraction and browser Web Speech adapter. It checks microphone permission and turns browser errors into user-facing messages.
+- `app/voice/speechRecognition.d.ts`: TypeScript declarations for the non-standard browser SpeechRecognition APIs.
+- `app/voice/transcriptStore.ts`: React transcript state for final and interim voice text.
+- `app/voice/micCapture.ts`: microphone capture helper used by the voice prototype.
 
-Example commands:
+### Legacy tldraw spike: do not use for new editor features
 
-- "Create an iPhone 15 screen"
-- "Add an iOS status bar"
-- "Add a rounded card"
-- "Make this radius 24"
-- "Use an iOS search field"
-- "Add a native tab bar"
-- "Make this look like Apple Settings"
+- `app/canvas/TldrawCanvas.tsx`: old tldraw canvas mount and seed document. Not used by `App`.
+- `app/canvas/customShapes.ts`: tldraw custom-shape spike support. Not used by the active editor.
+- `app/operations/applyOperations.ts`: old operation applier targeting tldraw's `Editor`. Replaced by `applySceneOperations.ts` for active work.
 
-## iOS Component Library
+## Suggested Next Work
 
-Add a component library system:
+Follow `TASKS.md`. The highest-value next product work is mobile design support:
 
-```ts
-type ComponentDefinition = {
-  id: string
-  name: string
-  category: 'ios' | 'material' | 'web'
-  createNodes: () => DesignNode[]
-}
-```
+1. Expand the dedicated iPhone frame catalog and device chrome. Defer iPad, Android, and custom devices.
+2. Define the component-definition and component-instance document model before inserting any iOS library content.
+3. Obtain a component source with a license that expressly permits this editor use; do not bundle Apple or Figma resources without license clearance.
+4. Build the first small iOS component library: navigation bar, tab bar, and button.
+5. Replace data-URL image storage with a durable asset store before large or shared documents.
+6. Replace snapshot history with typed operation transactions before broad AI or collaboration work.
 
-Initial components:
+## Voice/STT Direction
 
-- iPhone 15 Frame
-- iOS Status Bar
-- iOS Home Indicator
-- Navigation Bar
-- Tab Bar
-- Button
-- Search Field
-- Text Field
-- Switch
-- List Row
-- Sheet
-- Alert
-
-## STT Recommendation
-
-Do not rely on browser Web Speech API.
-
-Use:
-
-- OpenAI Realtime for voice + tool calling, or
-- Deepgram for dedicated streaming transcription.
-
-API keys should go through a backend endpoint, not directly in the browser.
-
-## Figma Engineering Reference
-
-Figma is not normal DOM rendering. It uses a custom scene graph and GPU-backed canvas renderer. Historically WebGL, now WebGPU. Their renderer is C++ compiled to WebAssembly for web.
-
-Figma's document model is object/property based:
-
-```ts
-Map<ObjectID, Map<Property, Value>>
-```
-
-Figma multiplayer is server-authoritative and CRDT-inspired, synced over WebSockets.
-
-References:
-
-- https://www.figma.com/blog/how-figmas-multiplayer-technology-works/
-- https://www.figma.com/blog/figma-rendering-powered-by-webgpu/
-- https://www.figma.com/blog/building-accessibility-into-a-canvas-based-product/
-
-## Next Task
-
-Replace the tldraw canvas with a custom SVG/HTML MVP editor:
-
-1. Create custom scene graph store.
-2. Render frames and nodes in SVG.
-3. Add selection and drag/move.
-4. Add property inspector for x/y/w/h/radius/fill/text.
-5. Add iPhone frame preset.
-6. Add basic iOS component library.
-7. Route typed voice commands to custom operations.
+Keep typed commands available. For production voice input, use a backend-proxied streaming STT provider such as Deepgram; OpenAI Realtime is another viable path when voice interaction and model tool calling need to be closely coupled. Browser Web Speech must remain a temporary demo adapter only.

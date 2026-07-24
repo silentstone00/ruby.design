@@ -24,21 +24,31 @@
 - [x] Add resize handles with aspect-ratio locking.
 - [x] Add multi-selection, marquee selection, and keyboard modifiers.
 - [x] Add pan, zoom, fit-to-selection, and a stable canvas coordinate system.
-- [x] Add direct text editing using an HTML overlay.
+- [x] Add direct in-place text editing inside SVG canvas nodes.
 - [x] Add fill, stroke, opacity, typography, and alignment controls in the inspector.
 - [x] Render true ellipse nodes and add line/arrow nodes to the custom renderer.
 - [x] Implement grouping, layer ordering, duplication, deletion, and rename.
 - [x] Improve selection outlines and add resize/rotation affordances.
 - [x] Add keyboard shortcuts for select, delete, duplicate, undo, redo, zoom, and pan.
+- [x] Keep in-place text editing aligned with the SVG viewport at different canvas sizes and zoom levels.
+- [x] Keep the canvas contained in its grid column while the properties panel scrolls independently.
+- [x] Keep sidebar actions reachable by wrapping the toolbar without horizontal scrolling.
+- [x] Keep drag, resize, and rotation pointer math stable for nodes nested inside frames.
+- [x] Add a contextual left-side Layers panel that shows only the active frame's hierarchy.
 
 ## Next: Mobile UI Design
 
-- [ ] Add iPhone, iPad, Android, and custom device-frame presets.
-- [ ] Support frame child nodes and clipping so screens contain their UI.
-- [ ] Add an insert toolbar for frames, text, rectangles, images, and components.
+- [x] Add separate custom-frame and iPhone device-frame insertion choices (iPhone 16 and iPhone 16 Pro).
+- [ ] Expand the dedicated iPhone frame preset/catalog foundation; defer iPad, Android, and custom devices.
+- [x] Support frame child nodes and clipping so screens contain their UI.
+- [x] Render nested frames inside their parent clipping coordinate system.
+- [x] Render frame names outside the frame boundary as editor labels.
+- [x] Reparent dropped nodes into the frame under their center, preserving visual position.
+- [x] Add an insert toolbar for frames, text, and rectangles.
+- [x] Enable image insertion with asset import, cropping, and image fills.
+- [ ] Enable component insertion once the licensed iOS component-library model exists.
 - [ ] Build a small native iOS component library: navigation bar, tab bar, button, input, list row, card, sheet, and status bar.
 - [ ] Add reusable components, instances, and component-property overrides.
-- [ ] Add image import, image cropping, and image fills.
 - [ ] Add responsive constraints and basic Auto Layout-like stacks.
 
 ## Voice and Intelligence
@@ -53,6 +63,7 @@
 ## Document and Platform
 
 - [ ] Replace snapshot-style undo with an operation log containing inverse operations and transactions.
+- [ ] Replace local data-URL image storage with a durable asset store before large or shared documents.
 - [ ] Add document migrations, import/export, and recovery for malformed documents.
 - [ ] Add durable backend persistence and document/project management.
 - [ ] Add SVG, PNG, and PDF export.
