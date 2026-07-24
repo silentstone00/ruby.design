@@ -47,6 +47,9 @@ export function parseDesignCommand(command: string, context: CanvasContext): Par
     return one({ type: 'resize', targetId: 'this', width: Math.round(width * factor), height: Math.round(height * factor) })
   }
 
+  const radius = extractRadius(text)
+  if (radius !== null) return one({ type: 'set_prop', targetId: 'this', path: 'props.cornerRadius', value: radius })
+
   const color = extractColor(text)
   if (color) return one({ type: 'set_prop', targetId: 'this', path: 'props.color', value: color })
 
@@ -84,4 +87,9 @@ function defaultTextFor(shape: ShapeKind) {
   if (shape === 'text') return 'Headline'
   if (shape === 'rect') return 'Button'
   return undefined
+}
+
+function extractRadius(text: string) {
+  const match = text.match(/(?:corner\s*)?radius\s*(?:to)?\s*(\d+)/)
+  return match ? Number(match[1]) : null
 }

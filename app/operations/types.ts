@@ -1,4 +1,4 @@
-export type ShapeKind = 'rect' | 'ellipse' | 'line' | 'arrow' | 'text'
+export type ShapeKind = 'frame' | 'rect' | 'ellipse' | 'line' | 'arrow' | 'text'
 
 export type ShapeProps = {
   x?: number
@@ -9,6 +9,7 @@ export type ShapeProps = {
   color?: string
   fill?: string
   opacity?: number
+  cornerRadius?: number
 }
 
 export type DesignOperation =

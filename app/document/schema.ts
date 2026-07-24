@@ -1,10 +1,11 @@
 import type { DesignOperation } from '../operations/types'
+import type { DesignScene } from './scene'
 
-export const DOCUMENT_SCHEMA_VERSION = 1
+export const DOCUMENT_SCHEMA_VERSION = 2
 
 export type RubyDesignDocument = {
   schemaVersion: typeof DOCUMENT_SCHEMA_VERSION
-  tldrawSnapshot: unknown
+  scene: DesignScene
   operationLog: DocumentOperationLogEntry[]
 }
 
@@ -15,10 +16,10 @@ export type DocumentOperationLogEntry = {
   createdAt: number
 }
 
-export function createEmptyDocument(snapshot: unknown): RubyDesignDocument {
+export function createEmptyDocument(scene: DesignScene): RubyDesignDocument {
   return {
     schemaVersion: DOCUMENT_SCHEMA_VERSION,
-    tldrawSnapshot: snapshot,
+    scene,
     operationLog: [],
   }
 }

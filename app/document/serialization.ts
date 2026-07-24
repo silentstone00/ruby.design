@@ -1,14 +1,13 @@
-import { getSnapshot, loadSnapshot as loadTldrawSnapshot, type Editor } from 'tldraw'
 import { createEmptyDocument, type RubyDesignDocument } from './schema'
 import { migrateDocument } from './migrations'
+import type { DesignScene } from './scene'
 
-export function serializeDocument(editor: Editor): RubyDesignDocument {
-  return createEmptyDocument(getSnapshot(editor.store))
+export function serializeDocument(scene: DesignScene): RubyDesignDocument {
+  return createEmptyDocument(scene)
 }
 
-export function restoreDocument(editor: Editor, payload: unknown) {
-  const document = migrateDocument(payload)
-  loadTldrawSnapshot(editor.store, document.tldrawSnapshot as Parameters<typeof loadTldrawSnapshot>[1])
+export function restoreDocument(payload: unknown): RubyDesignDocument {
+  return migrateDocument(payload)
 }
 
 export function stringifyDocument(document: RubyDesignDocument): string {
