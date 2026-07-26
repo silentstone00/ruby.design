@@ -1,8 +1,9 @@
 import { AlignCenter, AlignLeft, AlignRight } from 'lucide-react'
-import type { CornerRadii, DesignNode, ImageCrop } from '../document/scene'
+import type { Constraints, CornerRadii, DesignNode, FrameLayout, ImageCrop, LayoutSizing } from '../document/scene'
 
 type InspectorProps = {
   node: DesignNode | null
+  parent: DesignNode | null
   onRadiusChange: (radius: CornerRadii) => void
   onUpdate: (patch: Partial<DesignNode>) => void
 }
@@ -14,10 +15,14 @@ const corners: Array<[keyof CornerRadii, string]> = [
   ['bottomLeft', 'Bottom left'],
 ]
 
-export function Inspector({ node, onRadiusChange, onUpdate }: InspectorProps) {
+export function Inspector({ node, parent, onRadiusChange, onUpdate }: InspectorProps) {
   if (!node) return null
   const radius = node.radius
   const canRound = node.type === 'rect' || node.type === 'frame' || node.type === 'image'
+  const layout: FrameLayout = node.layout ?? { direction: 'none', gap: 12, padding: { top: 16, right: 16, bottom: 16, left: 16 }, align: 'start', justify: 'start' }
+  const sizing: LayoutSizing = node.layoutSizing ?? { horizontal: 'fixed', vertical: 'fixed' }
+  const constraints: Constraints = node.constraints ?? { horizontal: 'left', vertical: 'top' }
+  const isAutoLayoutChild = parent?.type === 'frame' && parent.layout?.direction && parent.layout.direction !== 'none'
   const updateCrop = (patch: Partial<ImageCrop>) => {
     const crop = node.imageCrop ?? { x: 0, y: 0, width: 1, height: 1 }
     const width = clampCrop(patch.width ?? crop.width)
@@ -63,6 +68,33 @@ export function Inspector({ node, onRadiusChange, onUpdate }: InspectorProps) {
           <label>Width %<input type="number" min="1" max="100" value={Math.round((node.imageCrop?.width ?? 1) * 100)} onInput={(event) => updateCrop({ width: Number(event.currentTarget.value) / 100 })} /></label>
           <label>Height %<input type="number" min="1" max="100" value={Math.round((node.imageCrop?.height ?? 1) * 100)} onInput={(event) => updateCrop({ height: Number(event.currentTarget.value) / 100 })} /></label>
         </div>
+      </fieldset>}
+      {node.type === 'frame' && <fieldset className="layout-controls">
+        <legend>Auto layout</legend>
+        <label>Direction<select value={layout.direction} onChange={(event) => onUpdate({ layout: { ...layout, direction: event.currentTarget.value as FrameLayout['direction'] } })}><option value="none">Free layout</option><option value="vertical">Vertical</option><option value="horizontal">Horizontal</option></select></label>
+        {layout.direction !== 'none' && <>
+          <div className="inspector-grid">
+            <label>Gap<input type="number" min="0" value={layout.gap} onInput={(event) => onUpdate({ layout: { ...layout, gap: Math.max(0, Number(event.currentTarget.value)) } })} /></label>
+            <label>Align<select value={layout.align} onChange={(event) => onUpdate({ layout: { ...layout, align: event.currentTarget.value as FrameLayout['align'] } })}><option value="start">Start</option><option value="center">Center</option><option value="end">End</option><option value="stretch">Stretch</option></select></label>
+            <label>Distribute<select value={layout.justify} onChange={(event) => onUpdate({ layout: { ...layout, justify: event.currentTarget.value as FrameLayout['justify'] } })}><option value="start">Start</option><option value="center">Center</option><option value="end">End</option><option value="space-between">Space between</option></select></label>
+          </div>
+          <div className="inset-grid">
+            <label>Top<input type="number" min="0" value={layout.padding.top} onInput={(event) => onUpdate({ layout: { ...layout, padding: { ...layout.padding, top: Math.max(0, Number(event.currentTarget.value)) } } })} /></label>
+            <label>Right<input type="number" min="0" value={layout.padding.right} onInput={(event) => onUpdate({ layout: { ...layout, padding: { ...layout.padding, right: Math.max(0, Number(event.currentTarget.value)) } } })} /></label>
+            <label>Bottom<input type="number" min="0" value={layout.padding.bottom} onInput={(event) => onUpdate({ layout: { ...layout, padding: { ...layout.padding, bottom: Math.max(0, Number(event.currentTarget.value)) } } })} /></label>
+            <label>Left<input type="number" min="0" value={layout.padding.left} onInput={(event) => onUpdate({ layout: { ...layout, padding: { ...layout.padding, left: Math.max(0, Number(event.currentTarget.value)) } } })} /></label>
+          </div>
+        </>}
+      </fieldset>}
+      {node.parentId && <fieldset className="layout-controls">
+        <legend>{isAutoLayoutChild ? 'Auto layout sizing' : 'Constraints'}</legend>
+        {isAutoLayoutChild ? <div className="inspector-grid">
+          <label>Horizontal<select value={sizing.horizontal} onChange={(event) => onUpdate({ layoutSizing: { ...sizing, horizontal: event.currentTarget.value as LayoutSizing['horizontal'] } })}><option value="fixed">Fixed</option><option value="fill">Fill</option><option value="hug">Hug</option></select></label>
+          <label>Vertical<select value={sizing.vertical} onChange={(event) => onUpdate({ layoutSizing: { ...sizing, vertical: event.currentTarget.value as LayoutSizing['vertical'] } })}><option value="fixed">Fixed</option><option value="fill">Fill</option><option value="hug">Hug</option></select></label>
+        </div> : <div className="inspector-grid">
+          <label>Horizontal<select value={constraints.horizontal} onChange={(event) => onUpdate({ constraints: { ...constraints, horizontal: event.currentTarget.value as Constraints['horizontal'] } })}><option value="left">Left</option><option value="right">Right</option><option value="left-right">Left &amp; right</option><option value="center">Center</option><option value="scale">Scale</option></select></label>
+          <label>Vertical<select value={constraints.vertical} onChange={(event) => onUpdate({ constraints: { ...constraints, vertical: event.currentTarget.value as Constraints['vertical'] } })}><option value="top">Top</option><option value="bottom">Bottom</option><option value="top-bottom">Top &amp; bottom</option><option value="center">Center</option><option value="scale">Scale</option></select></label>
+        </div>}
       </fieldset>}
       {node.text !== undefined && <fieldset className="typography-controls">
         <legend>Typography</legend>

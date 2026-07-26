@@ -1,3 +1,5 @@
+import type { OperationTransaction } from '../document/history'
+
 export type ShapeKind = 'frame' | 'rect' | 'ellipse' | 'line' | 'arrow' | 'text'
 
 export type ShapeProps = {
@@ -29,6 +31,8 @@ export type OperationResult = {
   ok: boolean
   command: string
   operations: DesignOperation[]
+  transaction?: OperationTransaction
   message: string
   createdAt: number
 }
+

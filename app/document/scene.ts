@@ -12,6 +12,33 @@ export type ImageCrop = {
   height: number
 }
 
+export type LayoutAxis = 'fixed' | 'fill' | 'hug'
+
+export type LayoutSizing = {
+  horizontal: LayoutAxis
+  vertical: LayoutAxis
+}
+
+export type Insets = {
+  top: number
+  right: number
+  bottom: number
+  left: number
+}
+
+export type FrameLayout = {
+  direction: 'none' | 'horizontal' | 'vertical'
+  gap: number
+  padding: Insets
+  align: 'start' | 'center' | 'end' | 'stretch'
+  justify: 'start' | 'center' | 'end' | 'space-between'
+}
+
+export type Constraints = {
+  horizontal: 'left' | 'right' | 'left-right' | 'center' | 'scale'
+  vertical: 'top' | 'bottom' | 'top-bottom' | 'center' | 'scale'
+}
+
 export type DesignNode = {
   id: string
   type: 'frame' | 'rect' | 'ellipse' | 'line' | 'arrow' | 'text' | 'image'
@@ -40,6 +67,9 @@ export type DesignNode = {
   imageSize?: { width: number; height: number }
   imageCrop?: ImageCrop
   groupId?: string
+  layout?: FrameLayout
+  layoutSizing?: LayoutSizing
+  constraints?: Constraints
 }
 
 export type DesignScene = {

@@ -1,6 +1,7 @@
 import { Maximize2, ZoomIn, ZoomOut } from 'lucide-react'
-import { type KeyboardEvent, type PointerEvent, type WheelEvent, useEffect, useRef, useState } from 'react'
+import { type KeyboardEvent, type PointerEvent, type WheelEvent, useEffect, useMemo, useRef, useState } from 'react'
 import type { DesignNode, DesignScene } from '../document/scene'
+import { isAutoLayoutChild, resolveSceneLayout } from '../document/layout'
 
 type Point = { x: number; y: number }
 type Bounds = { x: number; y: number; width: number; height: number }
@@ -41,6 +42,7 @@ export function DesignCanvas({ scene, selectedIds, onSelect, onSelectMany, onHov
   const [spaceDown, setSpaceDown] = useState(false)
   const svgRef = useRef<SVGSVGElement>(null)
   const primaryId = selectedIds.at(-1) ?? null
+  const visualScene = useMemo(() => resolveSceneLayout(scene), [scene])
 
   useEffect(() => {
     const svg = svgRef.current
@@ -96,6 +98,7 @@ export function DesignCanvas({ scene, selectedIds, onSelect, onSelectMany, onHov
     const toggle = event.shiftKey || event.metaKey || event.ctrlKey
     const ids = selectedIds.includes(node.id) && !toggle ? selectedIds : [node.id]
     onSelect(node.id, { toggle })
+    if (isAutoLayoutChild(visualScene, node)) return
     const point = toCanvasPoint(event)
     setInteraction({ type: 'move', ids, last: point })
     onMove(ids, 0, 0, 'start')
@@ -114,7 +117,7 @@ export function DesignCanvas({ scene, selectedIds, onSelect, onSelectMany, onHov
     if (event.button !== 0 || spaceDown) return
     event.stopPropagation()
     const point = toCanvasPoint(event)
-    setInteraction({ type: 'rotate', id: node.id, origin: node.rotation ?? 0, startAngle: angleFromNodeCenter(getWorldNode(scene, node.id), point) })
+    setInteraction({ type: 'rotate', id: node.id, origin: node.rotation ?? 0, startAngle: angleFromNodeCenter(getWorldNode(visualScene, node.id), point) })
     onRotate(node.id, node.rotation ?? 0, 'start')
   }
 
@@ -158,14 +161,14 @@ export function DesignCanvas({ scene, selectedIds, onSelect, onSelectMany, onHov
       return
     }
     if (interaction.type === 'rotate') {
-      const node = getWorldNode(scene, interaction.id)
+      const node = getWorldNode(visualScene, interaction.id)
       if (!node) return
       onRotate(interaction.id, interaction.origin + normalizeAngle(angleFromNodeCenter(node, point) - interaction.startAngle), 'move')
       return
     }
     const bounds = boundsFromPoints(interaction.start, point)
     setMarquee(bounds)
-    const overlapping = scene.nodes.filter((node) => intersects(bounds, getWorldNode(scene, node.id))).map((node) => node.id)
+    const overlapping = visualScene.nodes.filter((node) => intersects(bounds, getWorldNode(visualScene, node.id))).map((node) => node.id)
     onSelectMany([...new Set([...interaction.baseIds, ...overlapping])])
   }
 
@@ -202,9 +205,9 @@ export function DesignCanvas({ scene, selectedIds, onSelect, onSelectMany, onHov
   }
 
   function fitSelection() {
-    const nodes = scene.nodes.filter((node) => selectedIds.includes(node.id))
+    const nodes = visualScene.nodes.filter((node) => selectedIds.includes(node.id))
     if (!nodes.length) return
-    const worldNodes = nodes.map((node) => getWorldNode(scene, node.id))
+    const worldNodes = nodes.map((node) => getWorldNode(visualScene, node.id))
     const left = Math.min(...worldNodes.map((node) => node.worldX))
     const top = Math.min(...worldNodes.map((node) => node.worldY))
     const right = Math.max(...worldNodes.map((node) => node.worldX + node.width))
@@ -215,7 +218,7 @@ export function DesignCanvas({ scene, selectedIds, onSelect, onSelectMany, onHov
     setViewport({ zoom, x: (left + right) / 2 - CANVAS_WIDTH / (zoom * 2), y: (top + bottom) / 2 - CANVAS_WIDTH / (canvasAspect * zoom * 2) })
   }
 
-  const primary = scene.nodes.find((node) => node.id === primaryId) ?? null
+  const primary = visualScene.nodes.find((node) => node.id === primaryId) ?? null
   const visibleWidth = CANVAS_WIDTH / viewport.zoom
   const visibleHeight = CANVAS_WIDTH / (viewport.zoom * canvasAspect)
   return (
@@ -224,9 +227,9 @@ export function DesignCanvas({ scene, selectedIds, onSelect, onSelectMany, onHov
       <svg ref={svgRef} className="design-canvas" viewBox={`${viewport.x} ${viewport.y} ${visibleWidth} ${visibleHeight}`} role="application" aria-label="Design canvas" onPointerDown={startMarquee} onPointerMove={movePointer} onPointerUp={endPointer} onPointerCancel={endPointer} onWheel={zoomAt}>
         <defs><pattern id="dots" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="1" fill="#cbd5e1" /></pattern><marker id="arrow-head" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke" /></marker></defs>
         <rect x="-5000" y="-5000" width="10000" height="10000" fill="url(#dots)" />
-        {scene.nodes.filter((node) => !node.parentId).map((node) => <Node key={node.id} node={node} worldNode={getWorldNode(scene, node.id)} children={renderChildren(scene, node.id, selectedIds, editingId, onHover, startNodeDrag, setEditingId, commitText)} selected={selectedIds.includes(node.id)} isEditing={editingId === node.id} onHover={onHover} onPointerDown={startNodeDrag} onDoubleClick={() => node.text !== undefined && setEditingId(node.id)} onTextCommit={commitText} onTextCancel={() => setEditingId(null)} />)}
+        {visualScene.nodes.filter((node) => !node.parentId).map((node) => <Node key={node.id} node={node} worldNode={getWorldNode(visualScene, node.id)} children={renderChildren(visualScene, node.id, selectedIds, editingId, onHover, startNodeDrag, setEditingId, commitText)} selected={selectedIds.includes(node.id)} isEditing={editingId === node.id} onHover={onHover} onPointerDown={startNodeDrag} onDoubleClick={() => node.text !== undefined && setEditingId(node.id)} onTextCommit={commitText} onTextCancel={() => setEditingId(null)} />)}
         {marquee && <rect className="marquee-selection" {...marquee} />}
-        {primary && <ResizeHandles node={getWorldNode(scene, primary.id)} sourceNode={primary} zoom={viewport.zoom} onPointerDown={startResize} onRotate={startRotate} />}
+        {primary && !isAutoLayoutChild(visualScene, primary) && <ResizeHandles node={getWorldNode(visualScene, primary.id)} sourceNode={primary} zoom={viewport.zoom} onPointerDown={startResize} onRotate={startRotate} />}
       </svg>
     </div>
   )

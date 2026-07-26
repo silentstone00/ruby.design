@@ -29,6 +29,7 @@ The `tldraw` dependency and spike files are still in the repo for reference, but
 - Dragging a node onto a frame reparents it to that frame using local coordinates; dragging it outside all frames detaches it to the canvas without a visual jump.
 - Frame insertion has two modes: Custom Frame creates a plain clipped artboard without device chrome; iPhone Frame offers iPhone 16 and iPhone 16 Pro presets, which render device chrome including the Dynamic Island. New frames are top-level screens, not children of the selected screen.
 - Frame names render above their frame boundary as editor labels; they are not part of the screen content.
+- Frames can use a basic vertical or horizontal Auto Layout stack with padding, gap, cross-axis alignment, main-axis distribution, and child fixed/fill/hug sizing. Free-layout frames support child pin, stretch, center, and scale constraints when the frame is resized.
 - Insert menu: Frame, Text, Rectangle, and Image create nodes. A selected frame, or a selected child inside a frame, becomes the insertion parent. Component remains disabled until its underlying system exists.
 - Image insertion: the Insert menu can import a local image as a native image node. Images retain source dimensions, are clipped by parent frames, support rounded corners, and have normalized crop controls in the inspector. Imported image data is currently stored in the local document as a data URL.
 - SVG canvas with zoom, fit-to-selection, wheel zoom, space/middle-mouse pan, plus keyboard viewport controls.
@@ -42,7 +43,7 @@ The `tldraw` dependency and spike files are still in the repo for reference, but
 - Inspector: name, x/y/w/h display, fill, stroke, opacity, corner radius, text color, font size, and text alignment.
 - Typed commands: create shapes, move, resize, change color, set text, and set corner radius.
 - Save/load to browser localStorage.
-- Basic undo/redo via scene snapshots.
+- Transaction-based operation log engine with atomic forward/inverse diffs (`app/document/history.ts`). Drag, resize, rotate, and property edits commit single transactional diffs.
 - Keyboard shortcuts outside form inputs:
   - `Cmd/Ctrl+A`: select all
   - `Cmd/Ctrl+D`: duplicate
@@ -58,10 +59,10 @@ The `tldraw` dependency and spike files are still in the repo for reference, but
 
 - Groups are currently flat `groupId` membership; frame nesting is supported, but nested group nodes are not.
 - Frame clipping is implemented for SVG-rendered content. The full component model, constraints, scrolling behavior, and Auto Layout semantics are still absent.
-- Undo/redo currently stores scene snapshots. Replace it with typed operation transactions and inverse operations before large documents or collaboration.
+- Undo/redo now uses atomic operation transactions (`app/document/history.ts`). CRDT real-time collaboration remains deferred until single-user operation contracts stabilize.
 - The browser Web Speech API often emits `network` errors. Do not treat it as production STT.
 - tldraw is legacy spike code, not the editor foundation.
-- No backend, auth, collaborative editing, exported files, component library, Auto Layout, or constraints yet. Image assets currently use local data URLs rather than a durable asset store.
+- No backend, auth, collaborative editing, exported files, or component library yet. Auto Layout stacks are a deliberately small first pass without wrapping, absolute children, reordering, scrolling, or min/max sizing. Image assets currently use local data URLs rather than a durable asset store.
 
 ## File Map
 
@@ -92,7 +93,9 @@ The `tldraw` dependency and spike files are still in the repo for reference, but
 
 ### Document model and persistence
 
-- `app/document/scene.ts`: active scene graph types (`DesignScene`, `DesignNode`, corner radii, image crop state), including `parentId` for local child coordinates and `clipContent` for frames; also holds iPhone preset dimensions and the starter document scene.
+- `app/document/scene.ts`: active scene graph types (`DesignScene`, `DesignNode`, corner radii, image crop state, layout, and constraints), including `parentId` for local child coordinates and `clipContent` for frames; also holds iPhone preset dimensions and the starter document scene.
+- `app/document/layout.ts`: pure layout resolver for horizontal and vertical Auto Layout frames; computes display geometry from stored frame layout and child sizing settings.
+- `app/document/history.ts`: operation transaction log engine (`AtomicOperation`, `OperationTransaction`, `applyTransaction`, `undoTransaction`, `diffNodeSnapshots`). Replaces full-scene snapshots with inverse diff transactions.
 - `app/document/schema.ts`: persisted Ruby Design document envelope and schema version.
 - `app/document/serialization.ts`: serializes/parses the current custom scene document.
 - `app/document/migrations.ts`: validates/migrates persisted document data; legacy tldraw data falls back to a starter custom scene.
@@ -130,7 +133,7 @@ Follow `TASKS.md`. The highest-value next product work is mobile design support:
 3. Obtain a component source with a license that expressly permits this editor use; do not bundle Apple or Figma resources without license clearance.
 4. Build the first small iOS component library: navigation bar, tab bar, and button.
 5. Replace data-URL image storage with a durable asset store before large or shared documents.
-6. Replace snapshot history with typed operation transactions before broad AI or collaboration work.
+6. Expand AI voice/typed command parser and spatial reference resolution ("the button below the title", spatial alignment, evaluation fixtures).
 
 ## Voice/STT Direction
 

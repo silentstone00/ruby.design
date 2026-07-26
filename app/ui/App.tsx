@@ -3,6 +3,8 @@ import { DesignCanvas } from '../canvas/DesignCanvas'
 import { createCanvasContext, type CanvasContext } from '../canvas/canvasContext'
 import { createStarterScene, IPHONE_16, IPHONE_16_PRO, type DesignScene } from '../document/scene'
 import type { CornerRadii, DesignNode } from '../document/scene'
+import { resolveSceneLayout } from '../document/layout'
+import { applyTransaction, diffNodeSnapshots, undoTransaction, type OperationTransaction } from '../document/history'
 import { parseDesignCommand } from '../intelligence/commandParser'
 import { applySceneOperations } from '../operations/applySceneOperations'
 import type { OperationResult } from '../operations/types'
@@ -19,8 +21,8 @@ export function App() {
   const [selectedIds, setSelectedIds] = useState<string[]>(['primary-button'])
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [history, setHistory] = useState<OperationResult[]>([])
-  const [undoStack, setUndoStack] = useState<DesignScene[]>([])
-  const [redoStack, setRedoStack] = useState<DesignScene[]>([])
+  const [undoStack, setUndoStack] = useState<OperationTransaction[]>([])
+  const [redoStack, setRedoStack] = useState<OperationTransaction[]>([])
   const interactionStart = useRef<{ scene: DesignScene; changed: boolean } | null>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
   const context: CanvasContext = useMemo(() => createCanvasContext(scene, selectedIds, hoveredId, history), [scene, selectedIds, hoveredId, history])
@@ -30,7 +32,11 @@ export function App() {
     const resolved = resolveReferences(parsed.operations, context)
     const { scene: next, result } = applySceneOperations(scene, resolved.operations, command)
     if (resolved.message && !result.ok) result.message = resolved.message
-    if (result.ok) { setUndoStack((items) => [...items, scene]); setRedoStack([]); setScene(next) }
+    if (result.ok && result.transaction) {
+      setUndoStack((items) => [...items, result.transaction!])
+      setRedoStack([])
+      setScene(next)
+    }
     setHistory((items) => [result, ...items].slice(0, 24))
   }
 
@@ -40,24 +46,42 @@ export function App() {
 
   function loadDocument() {
     const saved = loadSnapshot()
-    if (saved) { setUndoStack((items) => [...items, scene]); setScene(saved); setSelectedIds([]) }
+    if (saved) {
+      const transaction = diffNodeSnapshots(scene.nodes, saved.nodes, 'Load document')
+      if (transaction) {
+        setUndoStack((items) => [...items, transaction])
+        setRedoStack([])
+      }
+      setScene(saved)
+      setSelectedIds([])
+    }
   }
 
   function undo() {
-    const previous = undoStack.at(-1)
-    if (!previous) return
-    setUndoStack((items) => items.slice(0, -1)); setRedoStack((items) => [...items, scene]); setScene(previous)
+    const transaction = undoStack.at(-1)
+    if (!transaction) return
+    const next = undoTransaction(scene, transaction)
+    setUndoStack((items) => items.slice(0, -1))
+    setRedoStack((items) => [...items, transaction])
+    setScene(next)
   }
 
   function redo() {
-    const next = redoStack.at(-1)
-    if (!next) return
-    setRedoStack((items) => items.slice(0, -1)); setUndoStack((items) => [...items, scene]); setScene(next)
+    const transaction = redoStack.at(-1)
+    if (!transaction) return
+    const next = applyTransaction(scene, transaction)
+    setRedoStack((items) => items.slice(0, -1))
+    setUndoStack((items) => [...items, transaction])
+    setScene(next)
   }
 
-  function beginInteraction() { if (!interactionStart.current) interactionStart.current = { scene: structuredClone(scene), changed: false } }
-  function markInteractionChanged() { if (interactionStart.current) interactionStart.current.changed = true }
-  function finishInteraction() { const start = interactionStart.current; if (!start) return; interactionStart.current = null; if (start.changed) { setUndoStack((items) => [...items, start.scene]); setRedoStack([]) } }
+  function beginInteraction() {
+    if (!interactionStart.current) interactionStart.current = { scene: structuredClone(scene), changed: false }
+  }
+
+  function markInteractionChanged() {
+    if (interactionStart.current) interactionStart.current.changed = true
+  }
 
   function moveNodes(ids: string[], dx: number, dy: number, phase: 'start' | 'move' | 'end') {
     if (phase === 'start') beginInteraction()
@@ -69,35 +93,80 @@ export function App() {
       setScene((current) => ({ nodes: current.nodes.map((node) => movableIds.has(node.id) ? { ...node, x: node.x + dx, y: node.y + dy } : node) }))
     }
     if (phase === 'end') {
-      setScene((current) => reparentDroppedNodes(current, ids))
-      finishInteraction()
+      setScene((current) => {
+        const reparented = reparentDroppedNodes(current, ids)
+        const start = interactionStart.current
+        interactionStart.current = null
+        if (start && start.changed) {
+          const transaction = diffNodeSnapshots(start.scene.nodes, reparented.nodes, 'Move node(s)')
+          if (transaction) {
+            setUndoStack((items) => [...items, transaction])
+            setRedoStack([])
+          }
+        }
+        return reparented
+      })
     }
   }
 
   function resizeNode(id: string, bounds: { x: number; y: number; width: number; height: number }, phase: 'start' | 'move' | 'end') {
     if (phase === 'start') beginInteraction()
-    if (phase === 'move') { markInteractionChanged(); setScene((current) => ({ nodes: current.nodes.map((node) => node.id === id ? { ...node, ...bounds } : node) })) }
-    if (phase === 'end') finishInteraction()
+    if (phase === 'move') { markInteractionChanged(); setScene((current) => resizeWithConstraints(current, id, bounds)) }
+    if (phase === 'end') {
+      setScene((current) => {
+        const start = interactionStart.current
+        interactionStart.current = null
+        if (start && start.changed) {
+          const transaction = diffNodeSnapshots(start.scene.nodes, current.nodes, 'Resize node')
+          if (transaction) {
+            setUndoStack((items) => [...items, transaction])
+            setRedoStack([])
+          }
+        }
+        return current
+      })
+    }
   }
 
   function rotateNode(id: string, rotation: number, phase: 'start' | 'move' | 'end') {
     if (phase === 'start') beginInteraction()
     if (phase === 'move') { markInteractionChanged(); setScene((current) => ({ nodes: current.nodes.map((node) => node.id === id ? { ...node, rotation } : node) })) }
-    if (phase === 'end') finishInteraction()
+    if (phase === 'end') {
+      setScene((current) => {
+        const start = interactionStart.current
+        interactionStart.current = null
+        if (start && start.changed) {
+          const transaction = diffNodeSnapshots(start.scene.nodes, current.nodes, 'Rotate node')
+          if (transaction) {
+            setUndoStack((items) => [...items, transaction])
+            setRedoStack([])
+          }
+        }
+        return current
+      })
+    }
+  }
+
+  function commitScene(next: DesignScene, nextSelection = selectedIds, description = 'Update scene') {
+    const transaction = diffNodeSnapshots(scene.nodes, next.nodes, description)
+    if (transaction) {
+      setUndoStack((items) => [...items, transaction])
+      setRedoStack([])
+    }
+    setScene(next)
+    setSelectedIds(nextSelection)
   }
 
   function updateSelectedRadius(radius: CornerRadii) {
     const selectedId = selectedIds.at(-1)
     if (!selectedId) return
-    setUndoStack((items) => [...items, scene])
-    setRedoStack([])
-    setScene((current) => ({ nodes: current.nodes.map((node) => node.id === selectedId ? { ...node, radius } : node) }))
+    const next = { nodes: scene.nodes.map((node) => node.id === selectedId ? { ...node, radius } : node) }
+    commitScene(next, selectedIds, 'Set corner radius')
   }
 
   function updateNode(id: string, patch: Partial<DesignScene['nodes'][number]>) {
-    setUndoStack((items) => [...items, scene])
-    setRedoStack([])
-    setScene((current) => ({ nodes: current.nodes.map((node) => node.id === id ? { ...node, ...patch } : node) }))
+    const next = { nodes: scene.nodes.map((node) => node.id === id ? { ...node, ...patch } : node) }
+    commitScene(next, selectedIds, 'Update object')
   }
 
   function updateSelectedNode(patch: Partial<DesignScene['nodes'][number]>) {
@@ -105,58 +174,51 @@ export function App() {
     if (selectedId) updateNode(selectedId, patch)
   }
 
-  function commitScene(next: DesignScene, nextSelection = selectedIds) {
-    setUndoStack((items) => [...items, scene])
-    setRedoStack([])
-    setScene(next)
-    setSelectedIds(nextSelection)
-  }
-
   function duplicateSelection() {
     const selectedRoots = selectedIds.filter((id) => !hasSelectedAncestor(scene, id, new Set(selectedIds)))
     const copiedIds = new Set(scene.nodes.filter((node) => selectedRoots.some((rootId) => node.id === rootId || hasAncestor(scene, node.id, rootId))).map((node) => node.id))
     const idMap = new Map([...copiedIds].map((id) => [id, crypto.randomUUID()]))
     const copies = scene.nodes.filter((node) => copiedIds.has(node.id)).map((node) => ({ ...structuredClone(node), id: idMap.get(node.id)!, name: selectedRoots.includes(node.id) ? `${node.name} copy` : node.name, x: selectedRoots.includes(node.id) ? node.x + 24 : node.x, y: selectedRoots.includes(node.id) ? node.y + 24 : node.y, parentId: node.parentId ? idMap.get(node.parentId) ?? node.parentId : undefined, groupId: undefined }))
-    if (copies.length) commitScene({ nodes: [...scene.nodes, ...copies] }, copies.map((node) => node.id))
+    if (copies.length) commitScene({ nodes: [...scene.nodes, ...copies] }, copies.map((node) => node.id), 'Duplicate selection')
   }
 
   function deleteSelection() {
     if (!selectedIds.length) return
     const deletedIds = new Set(scene.nodes.filter((node) => selectedIds.some((id) => node.id === id || hasAncestor(scene, node.id, id))).map((node) => node.id))
-    commitScene({ nodes: scene.nodes.filter((node) => !deletedIds.has(node.id)) }, [])
+    commitScene({ nodes: scene.nodes.filter((node) => !deletedIds.has(node.id)) }, [], 'Delete selection')
   }
 
   function groupSelection() {
     if (selectedIds.length < 2) return
     const groupId = crypto.randomUUID()
-    commitScene({ nodes: scene.nodes.map((node) => selectedIds.includes(node.id) ? { ...node, groupId } : node) })
+    commitScene({ nodes: scene.nodes.map((node) => selectedIds.includes(node.id) ? { ...node, groupId } : node) }, selectedIds, 'Group selection')
   }
 
   function ungroupSelection() {
     const groupIds = new Set(scene.nodes.filter((node) => selectedIds.includes(node.id)).map((node) => node.groupId).filter(Boolean))
     if (!groupIds.size) return
-    commitScene({ nodes: scene.nodes.map((node) => node.groupId && groupIds.has(node.groupId) ? { ...node, groupId: undefined } : node) })
+    commitScene({ nodes: scene.nodes.map((node) => node.groupId && groupIds.has(node.groupId) ? { ...node, groupId: undefined } : node) }, selectedIds, 'Ungroup selection')
   }
 
   function reorderSelection(mode: 'front' | 'back') {
     const chosen = scene.nodes.filter((node) => selectedIds.includes(node.id))
     if (!chosen.length) return
     const other = scene.nodes.filter((node) => !selectedIds.includes(node.id))
-    commitScene({ nodes: mode === 'front' ? [...other, ...chosen] : [...chosen, ...other] })
+    commitScene({ nodes: mode === 'front' ? [...other, ...chosen] : [...chosen, ...other] }, selectedIds, `Reorder ${mode}`)
   }
 
   function insertNode(type: InsertableNode) {
     const parent = type === 'custom-frame' || type.startsWith('iphone-') ? undefined : findContainingFrame(scene, selectedIds.at(-1))
     const defaults = insertionDefaults(type, parent)
     const node = { id: crypto.randomUUID(), parentId: parent?.id, ...defaults }
-    commitScene({ nodes: [...scene.nodes, node] }, [node.id])
+    commitScene({ nodes: [...scene.nodes, node] }, [node.id], `Insert ${type}`)
   }
 
   async function insertImage(file: File) {
     const parent = findContainingFrame(scene, selectedIds.at(-1))
     const { src, width, height } = await readImageFile(file)
     const node = { id: crypto.randomUUID(), parentId: parent?.id, ...imageInsertionDefaults(file.name, src, { width, height }, parent) }
-    commitScene({ nodes: [...scene.nodes, node] }, [node.id])
+    commitScene({ nodes: [...scene.nodes, node] }, [node.id], 'Insert image')
   }
 
   function selectNode(id: string | null, modifiers?: { toggle: boolean }) {
@@ -177,6 +239,11 @@ export function App() {
     return () => window.removeEventListener('keydown', keyDown)
   }, [scene, selectedIds, undoStack, redoStack])
   const selectedNode = scene.nodes.find((node) => node.id === selectedIds.at(-1)) ?? null
+  // Auto Layout only recomputes x/y/width/height for display (DesignCanvas renders from
+  // this too); the Inspector must read the same resolved geometry or it shows stale numbers
+  // for shapes positioned by a stack.
+  const visualScene = useMemo(() => resolveSceneLayout(scene), [scene])
+  const inspectorNode = selectedNode ? visualScene.nodes.find((node) => node.id === selectedNode.id) ?? selectedNode : null
 
   return (
     <main className="app-shell">
@@ -192,6 +259,8 @@ export function App() {
       <aside className="side-panel" aria-label="Voice command controls">
         <Toolbar
           canRun={true}
+          canUndo={undoStack.length > 0}
+          canRedo={redoStack.length > 0}
           onUndo={undo}
           onRedo={redo}
           onSave={saveDocument}
@@ -208,7 +277,7 @@ export function App() {
           onInsert={insertNode}
           onInsertImage={() => imageInputRef.current?.click()}
         />
-        <Inspector node={selectedNode} onRadiusChange={updateSelectedRadius} onUpdate={updateSelectedNode} />
+        <Inspector node={inspectorNode} parent={selectedNode?.parentId ? scene.nodes.find((node) => node.id === selectedNode.parentId) ?? null : null} onRadiusChange={updateSelectedRadius} onUpdate={updateSelectedNode} />
         <TranscriptPanel onSubmit={runCommand} history={history} context={context} />
       </aside>
     </main>
@@ -232,6 +301,39 @@ function hasSelectedAncestor(scene: DesignScene, id: string, selectedIds: Set<st
 
 function hasAncestor(scene: DesignScene, id: string, ancestorId: string) {
   return hasSelectedAncestor(scene, id, new Set([ancestorId]))
+}
+
+function resizeWithConstraints(scene: DesignScene, id: string, bounds: { x: number; y: number; width: number; height: number }): DesignScene {
+  const nodes = scene.nodes.map((node) => ({ ...node }))
+  const nodeById = new Map(nodes.map((node) => [node.id, node]))
+
+  function resizeNodeAndChildren(node: DesignNode, next: { x: number; y: number; width: number; height: number }) {
+    const previous = { width: node.width, height: node.height }
+    Object.assign(node, next)
+    if (node.type !== 'frame' || node.layout?.direction && node.layout.direction !== 'none') return
+    const widthRatio = previous.width ? node.width / previous.width : 1
+    const heightRatio = previous.height ? node.height / previous.height : 1
+    const widthDelta = node.width - previous.width
+    const heightDelta = node.height - previous.height
+    for (const child of nodes.filter((candidate) => candidate.parentId === node.id)) {
+      const constraints = child.constraints ?? { horizontal: 'left' as const, vertical: 'top' as const }
+      const childNext = { x: child.x, y: child.y, width: child.width, height: child.height }
+      if (constraints.horizontal === 'right') childNext.x += widthDelta
+      if (constraints.horizontal === 'left-right') childNext.width = Math.max(24, childNext.width + widthDelta)
+      if (constraints.horizontal === 'center') childNext.x += widthDelta / 2
+      if (constraints.horizontal === 'scale') { childNext.x *= widthRatio; childNext.width = Math.max(24, childNext.width * widthRatio) }
+      if (constraints.vertical === 'bottom') childNext.y += heightDelta
+      if (constraints.vertical === 'top-bottom') childNext.height = Math.max(24, childNext.height + heightDelta)
+      if (constraints.vertical === 'center') childNext.y += heightDelta / 2
+      if (constraints.vertical === 'scale') { childNext.y *= heightRatio; childNext.height = Math.max(24, childNext.height * heightRatio) }
+      resizeNodeAndChildren(child, childNext)
+    }
+  }
+
+  const node = nodeById.get(id)
+  if (!node) return scene
+  resizeNodeAndChildren(node, bounds)
+  return { nodes }
 }
 
 function reparentDroppedNodes(scene: DesignScene, ids: string[]): DesignScene {

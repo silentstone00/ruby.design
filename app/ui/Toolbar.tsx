@@ -5,6 +5,8 @@ export type InsertableNode = 'custom-frame' | 'iphone-16-pro' | 'iphone-16' | 't
 
 type ToolbarProps = {
   canRun: boolean
+  canUndo?: boolean
+  canRedo?: boolean
   onUndo: () => void
   onRedo: () => void
   onSave: () => void
@@ -22,7 +24,7 @@ type ToolbarProps = {
   onInsertImage: () => void
 }
 
-export function Toolbar({ canRun, onUndo, onRedo, onSave, onLoad, canGroup, canUngroup, hasSelection, onDuplicate, onDelete, onGroup, onUngroup, onBringToFront, onSendToBack, onInsert, onInsertImage }: ToolbarProps) {
+export function Toolbar({ canRun, canUndo = canRun, canRedo = canRun, onUndo, onRedo, onSave, onLoad, canGroup, canUngroup, hasSelection, onDuplicate, onDelete, onGroup, onUngroup, onBringToFront, onSendToBack, onInsert, onInsertImage }: ToolbarProps) {
   const [insertOpen, setInsertOpen] = useState(false)
 
   function insert(type: InsertableNode) {
@@ -50,10 +52,10 @@ export function Toolbar({ canRun, onUndo, onRedo, onSave, onLoad, canGroup, canU
         </div>}
       </div>
       <span className="toolbar-divider" />
-      <button disabled={!canRun} onClick={onUndo} title="Undo" aria-label="Undo">
+      <button disabled={!canUndo} onClick={onUndo} title="Undo" aria-label="Undo">
         <Undo2 size={18} />
       </button>
-      <button disabled={!canRun} onClick={onRedo} title="Redo" aria-label="Redo">
+      <button disabled={!canRedo} onClick={onRedo} title="Redo" aria-label="Redo">
         <Redo2 size={18} />
       </button>
       <span className="toolbar-divider" />

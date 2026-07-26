@@ -16,6 +16,7 @@
 - [x] Reference resolution for commands such as "this", "that", and "selected".
 - [x] Local document save/load for the new scene format.
 - [x] Basic undo/redo for typed commands and inspector radius edits.
+- [x] Transaction-based operation log engine with atomic forward/inverse diffs (`app/document/history.ts`).
 - [x] Type-check, production build, and browser verification of the custom canvas path.
 
 ## Next: Core Editor
@@ -49,7 +50,7 @@
 - [ ] Enable component insertion once the licensed iOS component-library model exists.
 - [ ] Build a small native iOS component library: navigation bar, tab bar, button, input, list row, card, sheet, and status bar.
 - [ ] Add reusable components, instances, and component-property overrides.
-- [ ] Add responsive constraints and basic Auto Layout-like stacks.
+- [x] Add responsive constraints and basic Auto Layout-like stacks.
 
 ## Voice and Intelligence
 
@@ -62,7 +63,7 @@
 
 ## Document and Platform
 
-- [ ] Replace snapshot-style undo with an operation log containing inverse operations and transactions.
+- [x] Replace snapshot-style undo with an operation log containing inverse operations and transactions.
 - [ ] Replace local data-URL image storage with a durable asset store before large or shared documents.
 - [ ] Add document migrations, import/export, and recovery for malformed documents.
 - [ ] Add durable backend persistence and document/project management.

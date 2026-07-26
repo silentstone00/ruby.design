@@ -1,5 +1,6 @@
 import type { DesignScene } from '../document/scene'
 import { uniformRadius } from '../document/scene'
+import { diffNodeSnapshots } from '../document/history'
 import type { DesignOperation, OperationResult } from './types'
 
 export function applySceneOperations(scene: DesignScene, operations: DesignOperation[], command: string): {
@@ -19,7 +20,9 @@ export function applySceneOperations(scene: DesignScene, operations: DesignOpera
   let next = structuredClone(scene)
   try {
     for (const operation of operations) next = applyOne(next, operation)
+    const transaction = diffNodeSnapshots(scene.nodes, next.nodes, command)
     result.ok = true
+    result.transaction = transaction ?? undefined
     result.message = `Applied ${operations.length === 1 ? operations[0].type.replace(/_/g, ' ') : `${operations.length} changes`}.`
   } catch (error) {
     result.message = error instanceof Error ? error.message : 'Command failed.'
