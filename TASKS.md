@@ -55,15 +55,16 @@
 ## Voice and Intelligence
 
 - [ ] Replace the browser Web Speech API prototype with a production STT path, starting with Deepgram streaming through a backend.
-- [ ] Add a backend that keeps STT and LLM credentials off the client.
-- [ ] Define a strict LLM tool schema that produces validated scene operations.
+- [x] Add a backend that keeps STT and LLM credentials off the client (`supabase/functions/parse-command`).
+- [x] Define a strict LLM tool schema that produces validated scene operations (`zod` discriminated union validation).
 - [ ] Expand reference resolution for spatial phrases such as "the button below the title".
 - [ ] Add confirmation/previews for large AI changes and animate accepted changes.
-- [ ] Build command fixtures and evaluation tests for parsing, reference resolution, and operation results.
+- [x] Build command fixtures and evaluation tests for parsing, reference resolution, and operation results (`vitest` runner in `app/evals/evals.test.ts`).
 
 ## Document and Platform
 
 - [x] Replace snapshot-style undo with an operation log containing inverse operations and transactions.
+- [x] Fix undo-after-delete dropping restored nodes to the front of the paint order instead of their original stacking position.
 - [ ] Replace local data-URL image storage with a durable asset store before large or shared documents.
 - [ ] Add document migrations, import/export, and recovery for malformed documents.
 - [ ] Add durable backend persistence and document/project management.

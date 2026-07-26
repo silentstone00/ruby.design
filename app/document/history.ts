@@ -1,7 +1,7 @@
 import type { DesignNode, DesignScene } from './scene'
 
 export type AtomicOperation =
-  | { type: 'add_node'; node: DesignNode }
+  | { type: 'add_node'; node: DesignNode; index?: number }
   | { type: 'remove_node'; node: DesignNode }
   | { type: 'update_node'; id: string; patch: Partial<DesignNode>; previous: Partial<DesignNode> }
   | { type: 'reorder_nodes'; nodes: DesignNode[]; previousNodes: DesignNode[] }
@@ -33,7 +33,10 @@ export function applyAtomicOperation(scene: DesignScene, op: AtomicOperation): D
     if (scene.nodes.some((item) => item.id === op.node.id)) {
       return { nodes: scene.nodes.map((item) => (item.id === op.node.id ? structuredClone(op.node) : item)) }
     }
-    return { nodes: [...scene.nodes, structuredClone(op.node)] }
+    const nodes = [...scene.nodes]
+    const index = op.index === undefined ? nodes.length : Math.min(Math.max(op.index, 0), nodes.length)
+    nodes.splice(index, 0, structuredClone(op.node))
+    return { nodes }
   }
 
   if (op.type === 'remove_node') {
@@ -81,13 +84,19 @@ export function diffNodeSnapshots(
   const forward: AtomicOperation[] = []
   const inverse: AtomicOperation[] = []
 
-  // Check removed nodes
-  for (const initial of initialNodes) {
-    if (!finalMap.has(initial.id)) {
-      forward.push({ type: 'remove_node', node: structuredClone(initial) })
-      inverse.push({ type: 'add_node', node: structuredClone(initial) })
-    }
-  }
+  // Check removed nodes. Each removal's inverse must restore the node at its original
+  // array index (index == paint order), not append it -- otherwise undoing a delete
+  // resurrects the node in front of everything instead of back where it was.
+  // undoTransaction() applies `inverse` last-to-first, so pushing these in descending
+  // original-index order here means they get *applied* in ascending order, which is
+  // required for the splice-based reinsertion to land correctly when several nodes are
+  // removed in the same transaction (e.g. deleting a frame and its children together).
+  const removed: Array<{ node: DesignNode; index: number }> = []
+  initialNodes.forEach((initial, index) => {
+    if (!finalMap.has(initial.id)) removed.push({ node: initial, index })
+  })
+  for (const { node } of removed) forward.push({ type: 'remove_node', node: structuredClone(node) })
+  for (const { node, index } of [...removed].reverse()) inverse.push({ type: 'add_node', node: structuredClone(node), index })
 
   // Check added or updated nodes
   for (const final of finalNodes) {

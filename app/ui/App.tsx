@@ -15,6 +15,8 @@ import { Toolbar } from './Toolbar'
 import type { InsertableNode } from './Toolbar'
 import { Inspector } from './Inspector'
 import { LayersPanel } from './LayersPanel'
+import { SupabaseLlmClient } from '../intelligence/llmClient'
+import type { DesignOperation } from '../operations/types'
 
 export function App() {
   const [scene, setScene] = useState<DesignScene>(createStarterScene)
@@ -25,19 +27,41 @@ export function App() {
   const [redoStack, setRedoStack] = useState<OperationTransaction[]>([])
   const interactionStart = useRef<{ scene: DesignScene; changed: boolean } | null>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
+  const llmClient = useMemo(() => new SupabaseLlmClient(), [])
   const context: CanvasContext = useMemo(() => createCanvasContext(scene, selectedIds, hoveredId, history), [scene, selectedIds, hoveredId, history])
 
-  function runCommand(command: string) {
-    const parsed = parseDesignCommand(command, context)
-    const resolved = resolveReferences(parsed.operations, context)
+  async function runCommand(command: string) {
+    const pendingId = crypto.randomUUID()
+    const pendingResult: OperationResult = {
+      id: pendingId,
+      ok: false,
+      pending: true,
+      command,
+      operations: [],
+      message: 'Thinking...',
+      createdAt: Date.now(),
+    }
+    setHistory((items) => [pendingResult, ...items].slice(0, 24))
+
+    let ops: DesignOperation[] = []
+    try {
+      ops = await llmClient.interpret(command, context)
+    } catch {
+      const parsed = parseDesignCommand(command, context)
+      ops = parsed.operations
+    }
+
+    const resolved = resolveReferences(ops, context)
     const { scene: next, result } = applySceneOperations(scene, resolved.operations, command)
+    result.id = pendingId
+
     if (resolved.message && !result.ok) result.message = resolved.message
     if (result.ok && result.transaction) {
       setUndoStack((items) => [...items, result.transaction!])
       setRedoStack([])
       setScene(next)
     }
-    setHistory((items) => [result, ...items].slice(0, 24))
+    setHistory((items) => items.map((item) => (item.id === pendingId ? result : item)))
   }
 
   function saveDocument() {

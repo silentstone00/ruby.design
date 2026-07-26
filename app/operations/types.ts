@@ -32,6 +32,7 @@ export type OperationResult = {
   command: string
   operations: DesignOperation[]
   transaction?: OperationTransaction
+  pending?: boolean
   message: string
   createdAt: number
 }

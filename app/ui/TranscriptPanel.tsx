@@ -110,7 +110,7 @@ export function TranscriptPanel({ onSubmit, history, context }: TranscriptPanelP
           history.map((entry) => (
             <article className="history-item" key={entry.id}>
               <div className="history-command">{entry.command}</div>
-              <div className={entry.ok ? 'history-ok' : 'history-error'}>{entry.message}</div>
+              <div className={entry.pending ? 'history-pending' : entry.ok ? 'history-ok' : 'history-error'}>{entry.message}</div>
             </article>
           ))
         )}

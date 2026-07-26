@@ -95,7 +95,7 @@ The `tldraw` dependency and spike files are still in the repo for reference, but
 
 - `app/document/scene.ts`: active scene graph types (`DesignScene`, `DesignNode`, corner radii, image crop state, layout, and constraints), including `parentId` for local child coordinates and `clipContent` for frames; also holds iPhone preset dimensions and the starter document scene.
 - `app/document/layout.ts`: pure layout resolver for horizontal and vertical Auto Layout frames; computes display geometry from stored frame layout and child sizing settings.
-- `app/document/history.ts`: operation transaction log engine (`AtomicOperation`, `OperationTransaction`, `applyTransaction`, `undoTransaction`, `diffNodeSnapshots`). Replaces full-scene snapshots with inverse diff transactions.
+- `app/document/history.ts`: operation transaction log engine (`AtomicOperation`, `OperationTransaction`, `applyTransaction`, `undoTransaction`, `diffNodeSnapshots`). Replaces full-scene snapshots with inverse diff transactions. Removed nodes carry their original array index so undoing a delete restores paint order (front/behind), not just presence; multi-node deletes are restored by applying inverse re-insertions in ascending original-index order.
 - `app/document/schema.ts`: persisted Ruby Design document envelope and schema version.
 - `app/document/serialization.ts`: serializes/parses the current custom scene document.
 - `app/document/migrations.ts`: validates/migrates persisted document data; legacy tldraw data falls back to a starter custom scene.
@@ -107,9 +107,11 @@ The `tldraw` dependency and spike files are still in the repo for reference, but
 - `app/operations/applySceneOperations.ts`: active pure operation applier for the custom scene graph. Used for typed/voice commands.
 - `app/intelligence/commandParser.ts`: deterministic local parser for simple natural-language commands such as create, move, resize, color, text, and radius.
 - `app/referenceResolver/referenceResolver.ts`: resolves deictic targets including `this`, `that`, `it`, `selected`, and `hovered` against canvas context.
-- `app/intelligence/toolSchema.ts`: draft LLM tool schema for a future model-backed command parser.
-- `app/intelligence/llmClient.ts`: placeholder boundary for a future secure LLM integration; do not put API keys in the browser.
-- `app/evals/command-fixtures.jsonl`: command examples and expected operation fixtures; expand this as the parser grows.
+- `app/intelligence/toolSchema.ts`: LLM tool schema for function calling.
+- `app/intelligence/llmClient.ts`: `SupabaseLlmClient` calling the `parse-command` Supabase Edge Function with environment keys (`VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`).
+- `supabase/functions/parse-command/index.ts`: Deno Edge Function proxying OpenAI `gpt-4o-mini` with forced tool calling and strict `zod` discriminated union schema validation.
+- `app/evals/command-fixtures.jsonl`: command examples and expected operation fixtures.
+- `app/evals/evals.test.ts`: `vitest` evaluation runner testing both deterministic regex parsing and opt-in LLM Edge Function output against fixtures.
 
 ### Voice prototype
 

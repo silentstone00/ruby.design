@@ -64,13 +64,14 @@ function one(operation: DesignOperation): ParsedCommand {
 }
 
 function getCreateKind(text: string): ShapeKind | null {
-  if (!/\b(add|create|make|draw)\b/.test(text)) return null
   if (/\b(circle|ellipse|oval)\b/.test(text)) return 'ellipse'
   if (/\b(arrow)\b/.test(text)) return 'arrow'
   if (/\b(line)\b/.test(text)) return 'line'
   if (/\b(text|title|label|headline)\b/.test(text)) return 'text'
   if (/\b(button|card|box|rectangle|square)\b/.test(text)) return 'rect'
-  return 'rect'
+  if (/\b(frame)\b/.test(text)) return 'frame'
+  if (/\b(add|create|draw)\b/.test(text)) return 'rect'
+  return null
 }
 
 function extractColor(text: string) {

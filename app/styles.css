@@ -606,10 +606,16 @@ select {
 
 .history-ok,
 .history-error,
+.history-pending,
 .empty-state {
   color: #655d53;
   font-size: 13px;
   line-height: 1.4;
+}
+
+.history-pending {
+  color: #2563eb;
+  font-style: italic;
 }
 
 .history-error {
