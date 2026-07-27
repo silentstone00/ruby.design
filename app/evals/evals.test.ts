@@ -3,9 +3,14 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { parseDesignCommand } from '../intelligence/commandParser'
-import { resolveReferences } from '../referenceResolver/referenceResolver'
+import {
+  calculateRelativePlacement,
+  findMatchingShape,
+  parseSpatialTarget,
+  resolveReferences,
+} from '../referenceResolver/referenceResolver'
 import { SupabaseLlmClient } from '../intelligence/llmClient'
-import type { CanvasContext } from '../canvas/canvasContext'
+import type { CanvasContext, CanvasShapeSummary } from '../canvas/canvasContext'
 import type { DesignOperation } from '../operations/types'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -56,6 +61,30 @@ describe('Command Parsing Evals', () => {
       if ('targetId' in expectedFirst && 'targetId' in firstOp) {
         expect(firstOp.targetId).toBe(expectedFirst.targetId)
       }
+    })
+  })
+
+  describe('Spatial Reference Unit Tests', () => {
+    it('parses spatial phrases correctly', () => {
+      expect(parseSpatialTarget('below:title')).toEqual({ relation: 'below', anchorQuery: 'title' })
+      expect(parseSpatialTarget('move below the button')).toEqual({ relation: 'below', anchorQuery: 'button' })
+      expect(parseSpatialTarget('to the right of card')).toEqual({ relation: 'right_of', anchorQuery: 'card' })
+    })
+
+    it('matches shapes by name or role', () => {
+      const shapes: CanvasShapeSummary[] = [
+        { id: 'heading-1', type: 'text', x: 0, y: 0, width: 200, height: 40, props: { name: 'Main Heading', text: 'Welcome' } },
+        { id: 'btn-submit', type: 'rect', x: 0, y: 100, width: 120, height: 44, props: { name: 'Submit Button' } },
+      ]
+      expect(findMatchingShape('heading', shapes)?.id).toBe('heading-1')
+      expect(findMatchingShape('button', shapes)?.id).toBe('btn-submit')
+    })
+
+    it('calculates relative spatial placement', () => {
+      const anchor: CanvasShapeSummary = { id: 'title', type: 'text', x: 100, y: 50, width: 200, height: 40, props: {} }
+      const target: CanvasShapeSummary = { id: 'box', type: 'rect', x: 100, y: 500, width: 100, height: 50, props: {} }
+      const placement = calculateRelativePlacement('below', anchor, target, 24)
+      expect(placement.dy).toBe(-386)
     })
   })
 

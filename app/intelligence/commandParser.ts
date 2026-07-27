@@ -12,6 +12,28 @@ export function parseDesignCommand(command: string, context: CanvasContext): Par
   if (/\bundo\b/.test(text)) return one({ type: 'undo' })
   if (/\bredo\b/.test(text)) return one({ type: 'redo' })
 
+  const spatialMoveMatch = text.match(/\b(?:move|place|position)\s+(below|under|above|over|right of|left of|next to|inside)\s+(?:the\s+)?(.+)/)
+  if (spatialMoveMatch) {
+    const rel = spatialMoveMatch[1].replace('under', 'below').replace('over', 'above').replace(' ', '_')
+    const anchor = spatialMoveMatch[2].trim()
+    return one({
+      type: 'move',
+      targetId: `${rel}:${anchor}`,
+      dx: 0,
+      dy: 0,
+    })
+  }
+
+  const radius = extractRadius(text)
+  if (radius !== null) return one({ type: 'set_prop', targetId: 'this', path: 'props.cornerRadius', value: radius })
+
+  const color = extractColor(text)
+  if (color && !/\b(add|create|draw|insert)\b/.test(text)) {
+    const targetMatch = text.match(/\b(?:make|set|change)\s+(?:the\s+)?([a-z0-9_-]+)\s+(?:to\s+)?/)?.[1]
+    const targetId = targetMatch && targetMatch !== 'it' && targetMatch !== 'this' ? targetMatch : 'this'
+    return one({ type: 'set_prop', targetId, path: 'props.color', value: color })
+  }
+
   const createKind = getCreateKind(text)
   if (createKind) {
     return one({
@@ -46,12 +68,6 @@ export function parseDesignCommand(command: string, context: CanvasContext): Par
     const factor = /\bsmaller\b/.test(text) ? 0.78 : 1.25
     return one({ type: 'resize', targetId: 'this', width: Math.round(width * factor), height: Math.round(height * factor) })
   }
-
-  const radius = extractRadius(text)
-  if (radius !== null) return one({ type: 'set_prop', targetId: 'this', path: 'props.cornerRadius', value: radius })
-
-  const color = extractColor(text)
-  if (color) return one({ type: 'set_prop', targetId: 'this', path: 'props.color', value: color })
 
   const quoted = extractQuotedText(command)
   if (quoted) return one({ type: 'set_text', targetId: 'this', text: quoted })

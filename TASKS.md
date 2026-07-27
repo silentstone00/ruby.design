@@ -57,7 +57,7 @@
 - [ ] Replace the browser Web Speech API prototype with a production STT path, starting with Deepgram streaming through a backend.
 - [x] Add a backend that keeps STT and LLM credentials off the client (`supabase/functions/parse-command`).
 - [x] Define a strict LLM tool schema that produces validated scene operations (`zod` discriminated union validation).
-- [ ] Expand reference resolution for spatial phrases such as "the button below the title".
+- [x] Expand reference resolution for spatial phrases such as "the button below the title" (`referenceResolver.ts` spatial geometry solver).
 - [ ] Add confirmation/previews for large AI changes and animate accepted changes.
 - [x] Build command fixtures and evaluation tests for parsing, reference resolution, and operation results (`vitest` runner in `app/evals/evals.test.ts`).
 

@@ -2,3 +2,5 @@
 {"command":"make it bigger","context":{"selectedIds":["shape:box"],"hoverId":null},"expected":[{"type":"resize","targetId":"shape:box"}]}
 {"command":"move this left a bit","context":{"selectedIds":["shape:box"],"hoverId":null},"expected":[{"type":"move","targetId":"shape:box","dx":-24,"dy":0}]}
 {"command":"make this red","context":{"selectedIds":["shape:box"],"hoverId":null},"expected":[{"type":"set_prop","targetId":"shape:box","path":"props.color","value":"red"}]}
+{"command":"move below the title","context":{"selectedIds":["shape:box"],"hoverId":null},"expected":[{"type":"move","targetId":"shape:box"}]}
+{"command":"make title red","context":{"selectedIds":[],"hoverId":null},"expected":[{"type":"set_prop","targetId":"welcome-title","path":"props.color","value":"red"}]}
