@@ -63,13 +63,11 @@ describe('Command Parsing Evals', () => {
     const client = new SupabaseLlmClient()
     const shouldRun = process.env.RUN_LLM_EVALS === 'true' && client.isConfigured()
 
-    it.runIf(shouldRun)('evaluates LLM tool calling against fixtures', async () => {
-      for (const fixture of fixtures) {
-        const fullContext = buildMockContext(fixture)
-        const ops = await client.interpret(fixture.command, fullContext)
-        expect(ops.length).toBeGreaterThan(0)
-        expect(ops[0].type).toBe(fixture.expected[0].type)
-      }
-    })
+    it.runIf(shouldRun).each(fixtures)('evaluates LLM tool calling for "$command"', async (fixture) => {
+      const fullContext = buildMockContext(fixture)
+      const ops = await client.interpret(fixture.command, fullContext)
+      expect(ops.length).toBeGreaterThan(0)
+      expect(ops[0].type).toBe(fixture.expected[0].type)
+    }, 10000)
   })
 })

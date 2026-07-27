@@ -24,27 +24,27 @@ const createShapeOp = z.object({
 
 const setTextOp = z.object({
   type: z.literal('set_text'),
-  targetId: z.string(),
+  targetId: z.string().optional().default('this'),
   text: z.string(),
 })
 
 const setPropOp = z.object({
   type: z.literal('set_prop'),
-  targetId: z.string(),
-  path: z.string(),
-  value: z.union([z.string(), z.number(), z.boolean()]),
+  targetId: z.string().optional().default('this'),
+  path: z.string().optional().default('props.color'),
+  value: z.any().optional().default('red'),
 })
 
 const moveOp = z.object({
   type: z.literal('move'),
-  targetId: z.string(),
-  dx: z.number(),
-  dy: z.number(),
+  targetId: z.string().optional().default('this'),
+  dx: z.number().optional().default(0),
+  dy: z.number().optional().default(0),
 })
 
 const resizeOp = z.object({
   type: z.literal('resize'),
-  targetId: z.string(),
+  targetId: z.string().optional().default('this'),
   width: z.number().optional(),
   height: z.number().optional(),
 })
@@ -57,7 +57,7 @@ const alignOp = z.object({
 
 const reorderOp = z.object({
   type: z.literal('reorder'),
-  targetId: z.string(),
+  targetId: z.string().optional().default('this'),
   mode: z.enum(['front', 'back', 'forward', 'backward']),
 })
 
@@ -91,8 +91,10 @@ const requestPayloadSchema = z.object({
   command: z.string(),
   context: z.object({
     selectedIds: z.array(z.string()).optional(),
+    hoverId: z.string().nullable().optional(),
     hoveredId: z.string().nullable().optional(),
-    visibleShapes: z.array(z.object({ id: z.string(), type: z.string(), name: z.string() })).optional(),
+    visibleShapes: z.array(z.record(z.unknown())).optional(),
+    recentOperations: z.array(z.record(z.unknown())).optional(),
   }).passthrough(),
 })
 
@@ -129,15 +131,15 @@ ${JSON.stringify(context.visibleShapes ?? [], null, 2)}
 
 CURRENT SELECTION: ${JSON.stringify(context.selectedIds ?? [])}
 
-RULES:
+RULES FOR TOOL CALLING:
 1. Always output valid operations using the apply_design_operations function tool.
-2. For targetId in operations, reference objects using:
-   - Specific object ID from AVAILABLE CANVAS OBJECTS if identified by name or role.
-   - Deictic references: "selected", "this", "that", "it" if referring to the active selection.
-3. For create_shape:
-   - x, y coordinates default around 180 if unspecified.
-   - Default fill/stroke colors: buttons #2563eb, text #101828, frames #ffffff with stroke #cbd5e1.
-4. Always produce a non-empty operations array if command asks for canvas modifications.`
+2. Choose the exact matching operation type:
+   - For creating new elements (e.g. "add a blue button", "create a rectangle", "draw a line"): use create_shape with shape ("rect", "ellipse", "text", "frame", "line", "arrow") and props (color, fill, text, x, y, width, height).
+   - For resizing (e.g. "make it bigger", "make it smaller"): use resize with targetId ("this" or selected ID).
+   - For moving (e.g. "move left", "move this up"): use move with targetId, dx, dy.
+   - For modifying existing colors or properties (e.g. "make this red", "set corner radius to 16"): use set_prop with targetId, path ("props.color", "props.fill", "props.cornerRadius"), and value.
+3. For targetId, reference specific IDs from AVAILABLE CANVAS OBJECTS if matched, or deictic keywords ("this", "selected").
+4. Always produce a non-empty operations array.`
 
     const openAiRes = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -215,6 +217,13 @@ RULES:
     const validatedOps = []
 
     for (const rawOp of opsArray) {
+      if (rawOp && typeof rawOp === 'object' && rawOp.type === 'set_prop') {
+        if (!rawOp.path && rawOp.color) { rawOp.path = 'props.color'; rawOp.value = rawOp.color }
+        if (!rawOp.path && rawOp.fill) { rawOp.path = 'props.fill'; rawOp.value = rawOp.fill }
+        if (typeof rawOp.path === 'string' && !rawOp.path.startsWith('props.')) {
+          rawOp.path = `props.${rawOp.path}`
+        }
+      }
       const parsedOp = designOperationSchema.safeParse(rawOp)
       if (parsedOp.success) {
         validatedOps.push(parsedOp.data)
