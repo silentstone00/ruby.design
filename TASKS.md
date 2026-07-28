@@ -54,7 +54,7 @@
 
 ## Voice and Intelligence
 
-- [ ] Replace the browser Web Speech API prototype with a production STT path, starting with Deepgram streaming through a backend.
+- [x] Replace the browser Web Speech API prototype with a production STT path, starting with Deepgram streaming through a backend (`deepgramAdapter.ts` & `deepgram-token` Edge Function).
 - [x] Add a backend that keeps STT and LLM credentials off the client (`supabase/functions/parse-command`).
 - [x] Define a strict LLM tool schema that produces validated scene operations (`zod` discriminated union validation).
 - [x] Expand reference resolution for spatial phrases such as "the button below the title" (`referenceResolver.ts` spatial geometry solver).

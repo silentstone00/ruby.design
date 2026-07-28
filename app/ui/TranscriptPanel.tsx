@@ -2,7 +2,8 @@ import { FormEvent, useRef, useState } from 'react'
 import { Mic, SendHorizonal } from 'lucide-react'
 import type { CanvasContext } from '../canvas/canvasContext'
 import type { OperationResult } from '../operations/types'
-import { BrowserSpeechAdapter, type SttAdapter } from '../voice/sttAdapter'
+import { createSttAdapter } from '../voice/sttFactory'
+import type { SttAdapter } from '../voice/sttAdapter'
 import { useTranscriptState } from '../voice/transcriptStore'
 
 type TranscriptPanelProps = {
@@ -37,7 +38,7 @@ export function TranscriptPanel({ onSubmit, history, context }: TranscriptPanelP
       return
     }
 
-    const adapter = new BrowserSpeechAdapter()
+    const adapter = createSttAdapter()
     sttAdapter.current = adapter
     setIsListening(true)
 
